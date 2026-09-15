@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WOL Remote</string>
+    <string name="title">WOL Remote — pornire de la distanță</string>
+    <string name="label_server">Adresa serverului (relay)</string>
+    <string name="hint_server">https://numele-app.vercel.app</string>
+    <string name="label_mac">MAC address laptop</string>
+    <string name="hint_mac">AA:BB:CC:DD:EE:FF</string>
+    <string name="label_broadcast">Broadcast (gol = automat)</string>
+    <string name="hint_broadcast">192.168.1.255</string>
+    <string name="label_interval">Interval de polling (secunde)</string>
+    <string name="hint_interval">5</string>
+    <string name="note">Telefonul trebuie să fie pe același WiFi ca laptopul.</string>
+    <string name="status_loading">Se verifică…</string>
+</resources>
