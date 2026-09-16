@@ -15,6 +15,7 @@ class MainActivity : Activity() {
     private lateinit var broadcastInput: EditText
     private lateinit var intervalInput: EditText
     private lateinit var toggleButton: Button
+    private lateinit var testButton: Button
     private lateinit var statusText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,6 +27,7 @@ class MainActivity : Activity() {
         broadcastInput = findViewById(R.id.broadcast_input)
         intervalInput = findViewById(R.id.interval_input)
         toggleButton = findViewById(R.id.toggle_button)
+        testButton = findViewById(R.id.test_button)
         statusText = findViewById(R.id.status_text)
 
         val prefs = Prefs.get(this)
@@ -35,6 +37,7 @@ class MainActivity : Activity() {
         intervalInput.setText(prefs.getString(Prefs.KEY_INTERVAL, "5"))
 
         toggleButton.setOnClickListener { onToggleClicked() }
+        testButton.setOnClickListener { onTestClicked() }
         updateToggleButton()
         refreshStatus()
     }
@@ -85,6 +88,28 @@ class MainActivity : Activity() {
         val manager = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
         return manager.getRunningServices(Int.MAX_VALUE)
             .any { it.service.className == WakeService::class.java.name }
+    }
+
+    private fun onTestClicked() {
+        val mac = macInput.text.toString().trim()
+        if (mac.isEmpty()) {
+            Toast.makeText(this, "Introdu MAC-ul laptopului", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val broadcast = broadcastInput.text.toString().trim()
+        statusText.text = "Se trimite test WOL..."
+        Thread {
+            val result = try {
+                val targetText = WakeOnLan.send(mac, broadcast, applicationContext)
+                "Test WOL trimis → $targetText"
+            } catch (e: Exception) {
+                "Test eșuat: ${e.message ?: e.javaClass.simpleName}"
+            }
+            runOnUiThread {
+                statusText.text = result
+                Prefs.get(this).edit().putString(Prefs.KEY_LAST_EVENT, result).apply()
+            }
+        }.start()
     }
 
     private fun updateToggleButton() {

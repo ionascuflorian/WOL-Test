@@ -2,6 +2,9 @@ package com.example.wolremote
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
+import android.net.NetworkCapabilities
 import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -27,27 +30,73 @@ object WakeOnLan {
         return packet
     }
 
+    /**
+     * Rezolvă lista de ținte pentru magic packet: broadcast manual (dacă e dat),
+     * broadcast-ul subrețelei WiFi și 255.255.255.255 (limited broadcast) ca backup.
+     */
+    fun resolveTargets(context: Context, manualBroadcast: String): List<String> {
+        val targets = LinkedHashSet<String>()
+        manualBroadcast.trim().takeIf { it.isNotEmpty() }?.let { targets.add(it) }
+        detectBroadcastAddress(context).takeIf { it.isNotEmpty() }?.let { targets.add(it) }
+        targets.add("255.255.255.255")
+        return targets.toList()
+    }
+
+    /**
+     * Trimite magic packet-ul către toate țintele, pe rețeaua WiFi, și întoarce
+     * un text de diagnostic cu țintele folosite.
+     */
     @Throws(IOException::class)
-    fun send(mac: String, broadcastAddress: String, context: Context) {
+    fun send(mac: String, manualBroadcast: String, context: Context): String {
         val macBytes = parseMac(mac)
         val magic = buildMagicPacket(macBytes)
-        val target = if (broadcastAddress.isBlank()) {
-            detectBroadcastAddress(context)
-        } else {
-            broadcastAddress.trim()
-        }
-        val inetAddress = try {
-            InetAddress.getByName(target)
-        } catch (e: IllegalArgumentException) {
-            throw IOException("Invalid broadcast address: $target", e)
-        }
+        val targets = resolveTargets(context, manualBroadcast)
+        val wifiNetworks = findWifiNetworks(context.applicationContext)
+
         val socket = DatagramSocket()
         try {
             socket.broadcast = true
-            val packet = DatagramPacket(magic, magic.size, inetAddress, WOL_PORT)
-            socket.send(packet)
+            if (wifiNetworks.isNotEmpty()) {
+                try {
+                    wifiNetworks[0].bindSocket(socket)
+                } catch (_: IOException) {
+                    // fallback: trimitem prin rețeaua implicită
+                }
+            }
+
+            var packets = 0
+            repeat(2) {
+                for (target in targets) {
+                    try {
+                        val addr = InetAddress.getByName(target)
+                        socket.send(DatagramPacket(magic, magic.size, addr, WOL_PORT))
+                        packets++
+                        try {
+                            Thread.sleep(50)
+                        } catch (ie: InterruptedException) {
+                            Thread.currentThread().interrupt()
+                            return@repeat
+                        }
+                    } catch (_: IOException) {
+                        // țintă invalidă sau transport blocat — continuăm cu următoarea
+                    }
+                }
+            }
+            return "${targets.joinToString(", ")} (pachete: $packets)"
         } finally {
             socket.close()
+        }
+    }
+
+    private fun findWifiNetworks(context: Context): List<Network> {
+        return try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            cm.allNetworks.filter { network ->
+                val caps = cm.getNetworkCapabilities(network)
+                caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+            }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 
@@ -55,25 +104,36 @@ object WakeOnLan {
         return try {
             val cm = context.applicationContext
                 .getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            for (network in cm.allNetworks) {
-                val props = cm.getLinkProperties(network) ?: continue
-                for (linkAddress in props.linkAddresses) {
-                    val address = linkAddress.address
-                    if (address is Inet4Address && !address.isLoopbackAddress && !address.isLinkLocalAddress) {
-                        val prefix = linkAddress.prefixLength
-                        if (prefix == 0 || prefix > 30) continue
-                        val ipParts = address.address
-                        val ip = bytesToLong(ipParts)
-                        val mask = if (prefix == 32) 0xFFFFFFFFL else ((0xFFFFFFFFL shl (32 - prefix)) and 0xFFFFFFFFL)
-                        val broadcast = (ip or (mask.inv() and 0xFFFFFFFFL)) and 0xFFFFFFFFL
-                        return longToIp(broadcast)
-                    }
-                }
+
+            val active = cm.getActiveNetwork()
+            if (active != null) {
+                findBroadcast(cm.getLinkProperties(active))?.let { return it }
             }
-            "255.255.255.255"
+
+            for (network in cm.allNetworks) {
+                val found = findBroadcast(cm.getLinkProperties(network))
+                if (found != null) return found
+            }
+            ""
         } catch (_: Exception) {
-            "255.255.255.255"
+            ""
         }
+    }
+
+    private fun findBroadcast(props: LinkProperties?): String? {
+        if (props == null) return null
+        for (linkAddress in props.linkAddresses) {
+            val address = linkAddress.address
+            if (address is Inet4Address && !address.isLoopbackAddress && !address.isLinkLocalAddress) {
+                val prefix = linkAddress.prefixLength
+                if (prefix == 0 || prefix > 30) continue
+                val ip = bytesToLong(address.address)
+                val mask = (0xFFFFFFFFL shl (32 - prefix)) and 0xFFFFFFFFL
+                val broadcast = (ip or (mask.inv() and 0xFFFFFFFFL)) and 0xFFFFFFFFL
+                return longToIp(broadcast)
+            }
+        }
+        return null
     }
 
     private fun bytesToLong(bytes: ByteArray): Long {

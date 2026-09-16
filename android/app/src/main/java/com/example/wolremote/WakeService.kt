@@ -89,13 +89,13 @@ class WakeService : Service() {
                             recordEvent("Comandă detectată dar MAC nu e configurat")
                         } else {
                             val broadcast = prefs.getString(Prefs.KEY_BROADCAST, "")?.trim() ?: ""
-                            WakeOnLan.send(
+                            val target = WakeOnLan.send(
                                 mac,
                                 broadcast,
                                 applicationContext
                             )
                             Http.ack(server)
-                            recordEvent("Wake trimis (${result.id?.take(8)})")
+                            recordEvent("Wake trimis → $target (${mac}, id ${result.id?.take(8)})")
                         }
                     }
                     Thread.sleep(intervalSeconds * 1000L)
