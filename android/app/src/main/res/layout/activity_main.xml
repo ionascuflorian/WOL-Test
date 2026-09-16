@@ -78,6 +78,24 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:text="@string/label_target_ip"
+            android:textSize="14sp"
+            android:textColor="#374151"
+            android:paddingBottom="4dp" />
+
+        <EditText
+            android:id="@+id/target_ip_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/hint_target_ip"
+            android:inputType="text"
+            android:padding="12dp"
+            android:background="@android:drawable/editbox_background"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="@string/label_interval"
             android:textSize="14sp"
             android:textColor="#374151"

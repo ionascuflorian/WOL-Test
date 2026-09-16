@@ -8,6 +8,8 @@
     <string name="hint_mac">AA:BB:CC:DD:EE:FF</string>
     <string name="label_broadcast">Broadcast (gol = automat)</string>
     <string name="hint_broadcast">192.168.1.255</string>
+    <string name="label_target_ip">IP laptop (pentru confirmarea pornirii)</string>
+    <string name="hint_target_ip">192.168.1.10</string>
     <string name="label_interval">Interval de polling (secunde)</string>
     <string name="hint_interval">5</string>
     <string name="note">Telefonul trebuie să fie pe același WiFi ca laptopul.</string>

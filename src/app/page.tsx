@@ -10,6 +10,7 @@ import {
   ArrowUpRight,
   Sun,
   Moon,
+  CircleAlert,
 } from "lucide-react"
 
 type WakeRequest = {
@@ -17,7 +18,14 @@ type WakeRequest = {
   requestedAt: number
 }
 
-type Phase = "loading" | "idle" | "pending" | "delivered"
+type Confirmation = {
+  id: string
+  requestedAt: number
+  ackedAt: number
+  status: "sent" | "up"
+}
+
+type Phase = "loading" | "idle" | "pending" | "up" | "unconfirmed"
 
 function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString("ro-RO", {
@@ -30,6 +38,7 @@ function formatTime(ts: number) {
 export default function Home() {
   const [phase, setPhase] = useState<Phase>("loading")
   const [request, setRequest] = useState<WakeRequest | null>(null)
+  const [confirm, setConfirm] = useState<Confirmation | null>(null)
   const [sending, setSending] = useState(false)
   const [dark, setDark] = useState(false)
 
@@ -57,10 +66,20 @@ export default function Home() {
       const data = await res.json()
       if (data.pending && data.request) {
         setRequest(data.request)
+        setConfirm(null)
         setPhase("pending")
       } else {
         setRequest(null)
-        setPhase((prev) => (prev === "pending" ? "delivered" : "idle"))
+        if (data.last?.status === "up") {
+          setConfirm(data.last)
+          setPhase("up")
+        } else if (data.last?.status === "sent") {
+          setConfirm(data.last)
+          setPhase("unconfirmed")
+        } else {
+          setConfirm(null)
+          setPhase((prev) => (prev === "loading" ? "idle" : "idle"))
+        }
       }
     } catch {
       setPhase((prev) => (prev === "loading" ? "idle" : prev))
@@ -84,6 +103,7 @@ export default function Home() {
       const data = await res.json()
       if (data.ok && data.request) {
         setRequest(data.request)
+        setConfirm(null)
         setPhase("pending")
       }
     } finally {
@@ -93,7 +113,9 @@ export default function Home() {
 
   const heroLabel = sending
     ? "Se trimite comanda…"
-    : "Pornește laptopul"
+    : phase === "up"
+      ? "Laptop pornit ✓"
+      : "Pornește laptopul"
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-white text-zinc-900 dark:bg-[#0a0e1a] dark:text-zinc-100">
@@ -157,13 +179,13 @@ export default function Home() {
                 sending
                   ? "bg-[#007AFF]/90 text-white shadow-[0_10px_30px_-8px_rgba(0,122,255,0.55)] dark:bg-[#0A84FF]/85"
                   : "bg-white/80 text-[#007AFF] shadow-[0_10px_30px_-8px_rgba(0,122,255,0.45),inset_0_1px_0_rgba(255,255,255,0.95)] ring-1 ring-white/80 backdrop-blur hover:bg-white/95 dark:bg-white/12 dark:text-[#0A84FF] dark:hover:bg-white/18 dark:ring-white/15",
-                phase === "delivered" && !sending &&
+                phase === "up" && !sending &&
                   "bg-[#34C759]/12 text-[#28a745] dark:bg-[#34C759]/15 dark:text-[#34C759]",
               ].join(" ")}
             >
               {sending ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
-              ) : phase === "delivered" ? (
+              ) : phase === "up" ? (
                 <CheckCircle2 className="h-5 w-5" />
               ) : (
                 <Power className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
@@ -190,6 +212,11 @@ export default function Home() {
                     {request.id.slice(0, 8)} · {formatTime(request.requestedAt)}
                   </p>
                 )}
+                {(phase === "up" || phase === "unconfirmed") && confirm && (
+                  <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-400 dark:text-zinc-500">
+                    {confirm.id.slice(0, 8)} · confirmat la {formatTime(confirm.ackedAt)}
+                  </p>
+                )}
               </div>
               <StatusBadge phase={phase} />
             </div>
@@ -212,8 +239,10 @@ function StatusIcon({ phase }: { phase: Phase }) {
       return <Loader2 className={`${common} animate-spin text-zinc-400`} />
     case "pending":
       return <Send className={`${common} animate-pulse text-amber-500`} />
-    case "delivered":
+    case "up":
       return <CheckCircle2 className={`${common} text-[#34C759]`} />
+    case "unconfirmed":
+      return <CircleAlert className={`${common} text-amber-500`} />
     default:
       return <Radio className={`${common} text-zinc-400`} />
   }
@@ -225,8 +254,10 @@ function StatusText({ phase }: { phase: Phase }) {
       return "Se verifică starea dispozitivului…"
     case "pending":
       return "Comanda a fost trimisă și așteaptă dispozitivul Android."
-    case "delivered":
-      return "Pachetul de activare a fost trimis pe rețeaua locală."
+    case "up":
+      return "Laptopul a pornit — confirmat de dispozitivul Android."
+    case "unconfirmed":
+      return "Pachetul a fost trimis, dar laptopul nu a răspuns la confirmare."
     default:
       return "Dispozitivul Android e pregătit să primească comanda."
   }
@@ -237,13 +268,15 @@ function StatusBadge({ phase }: { phase: Phase }) {
     loading: "bg-zinc-500/10 text-zinc-500",
     idle: "bg-zinc-500/10 text-zinc-500",
     pending: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-    delivered: "bg-[#34C759]/15 text-[#28a745] dark:text-[#34C759]",
+    up: "bg-[#34C759]/15 text-[#28a745] dark:text-[#34C759]",
+    unconfirmed: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
   }
   const labels: Record<Phase, string> = {
     loading: "…",
     idle: "Alerta",
     pending: "În așteptare",
-    delivered: "Livrat",
+    up: "Pornit ✓",
+    unconfirmed: "Neconfirmat",
   }
   return (
     <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${styles[phase]}`}>

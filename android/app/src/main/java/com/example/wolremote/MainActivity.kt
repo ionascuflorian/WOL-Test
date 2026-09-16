@@ -13,6 +13,7 @@ class MainActivity : Activity() {
     private lateinit var serverInput: EditText
     private lateinit var macInput: EditText
     private lateinit var broadcastInput: EditText
+    private lateinit var targetIpInput: EditText
     private lateinit var intervalInput: EditText
     private lateinit var toggleButton: Button
     private lateinit var testButton: Button
@@ -25,6 +26,7 @@ class MainActivity : Activity() {
         serverInput = findViewById(R.id.server_input)
         macInput = findViewById(R.id.mac_input)
         broadcastInput = findViewById(R.id.broadcast_input)
+        targetIpInput = findViewById(R.id.target_ip_input)
         intervalInput = findViewById(R.id.interval_input)
         toggleButton = findViewById(R.id.toggle_button)
         testButton = findViewById(R.id.test_button)
@@ -34,6 +36,7 @@ class MainActivity : Activity() {
         serverInput.setText(prefs.getString(Prefs.KEY_SERVER, ""))
         macInput.setText(prefs.getString(Prefs.KEY_MAC, ""))
         broadcastInput.setText(prefs.getString(Prefs.KEY_BROADCAST, ""))
+        targetIpInput.setText(prefs.getString(Prefs.KEY_TARGET_IP, ""))
         intervalInput.setText(prefs.getString(Prefs.KEY_INTERVAL, "5"))
 
         toggleButton.setOnClickListener { onToggleClicked() }
@@ -67,6 +70,7 @@ class MainActivity : Activity() {
                 putString(Prefs.KEY_SERVER, server)
                 putString(Prefs.KEY_MAC, macInput.text.toString().trim())
                 putString(Prefs.KEY_BROADCAST, broadcastInput.text.toString().trim())
+                putString(Prefs.KEY_TARGET_IP, targetIpInput.text.toString().trim())
                 putString(Prefs.KEY_INTERVAL, interval.ifEmpty { "5" })
                 apply()
             }

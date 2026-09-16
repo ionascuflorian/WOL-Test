@@ -9,6 +9,7 @@ object Prefs {
     const val KEY_SERVER = "server_url"
     const val KEY_MAC = "mac_address"
     const val KEY_BROADCAST = "broadcast_address"
+    const val KEY_TARGET_IP = "target_ip"
     const val KEY_INTERVAL = "poll_interval"
     const val KEY_LAST_EVENT = "last_event"
 

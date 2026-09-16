@@ -14,6 +14,7 @@ class WakeService : Service() {
     companion object {
         private const val CHANNEL_ID = "wol_service"
         private const val NOTIF_ID = 1
+        private const val CONFIRM_TIMEOUT_MS = 150_000L
     }
 
     private val volunlock = "wol"
@@ -94,8 +95,14 @@ class WakeService : Service() {
                                 broadcast,
                                 applicationContext
                             )
-                            Http.ack(server)
-                            recordEvent("Wake trimis → $target (${mac}, id ${result.id?.take(8)})")
+                            val targetIp = prefs.getString(Prefs.KEY_TARGET_IP, "")?.trim() ?: ""
+                            val confirmed = targetIp.isNotBlank() && confirmBoot(targetIp)
+                            Http.ack(server, if (confirmed) "up" else "sent")
+                            recordEvent(if (confirmed) {
+                                "Laptop pornit ✓ pachet trimis → $target"
+                            } else {
+                                "Wake trimis → $target, dar nu s-a confirmat pornirea"
+                            })
                         }
                     }
                     Thread.sleep(intervalSeconds * 1000L)
@@ -110,6 +117,24 @@ class WakeService : Service() {
                 Thread.sleep(5000L)
             }
         }
+    }
+
+    /**
+     * Așteaptă ~2,5 minute ca laptopul să răspundă pe rețea, din 5 în 5 secunde.
+     */
+    private fun confirmBoot(targetIp: String): Boolean {
+        if (targetIp.isBlank()) return true
+        val deadline = System.currentTimeMillis() + CONFIRM_TIMEOUT_MS
+        while (running && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(5000)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                break
+            }
+            if (HostCheck.isReachable(targetIp)) return true
+        }
+        return false
     }
 
     private fun recordEvent(message: String) {

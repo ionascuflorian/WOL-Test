@@ -32,15 +32,18 @@ object Http {
         }
     }
 
-    fun ack(baseUrl: String) {
+    fun ack(baseUrl: String, status: String = "sent") {
         val url = baseUrl.trimEnd('/') + "/api/ack"
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
             connection.apply {
                 requestMethod = "POST"
+                doOutput = true
                 connectTimeout = TIMEOUT_MS
                 readTimeout = TIMEOUT_MS
+                setRequestProperty("Content-Type", "application/json")
             }
+            connection.outputStream.bufferedWriter().use { it.write("{\"status\":\"$status\"}") }
             val code = connection.responseCode
             if (code != 200) throw IOException("Ack failed: HTTP $code")
         } finally {
